@@ -56,5 +56,7 @@
 	</array>
 	<key>NSContactsUsageDescription</key>
 	<string>Нужен доступ к контактам для выбора экстренного контакта</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>Приложение использует NFC для записи и считывания медицинского профиля</string>
 </dict>
 </plist>

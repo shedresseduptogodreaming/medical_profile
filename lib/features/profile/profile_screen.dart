@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/nfc_service.dart';
 import 'edit_screen.dart';
 import 'qr_screen.dart';
+import '../emergency/emergency_screen.dart';
 
-/// Модель данных профиля — передаётся между экранами
 class ProfileData {
   final String lastName;
   final String firstName;
@@ -66,14 +67,15 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   ProfileData _profileData = const ProfileData();
 
-  // Фиксированные размеры и отступы
-  static const double _cardWidth = 366;
-  static const double _cardHeight = 173;
-  static const double _cardSpacing = 31;
+  static const double _profileCardHeight = 173;
+  static const double _buttonCardHeight = 130;
+  static const double _cardSpacing = 16;
   static const double _cardPadding = 21;
   static const double _titleFontSize = 40;
+  static const double _buttonFontSize = 30;
   static const double _infoFontSize = 22;
-  static const double _titleLineHeight = 46 / 40; // ≈ 1.15
+  static const double _titleLineHeight = 46 / 40;
+  static const double _buttonLineHeight = 36 / 30;
   static const double _borderRadius = 20;
   static const double _letterSpacing = -2;
 
@@ -98,11 +100,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _openNfc() async {
-    // TODO: подключить nfc_manager и записать данные профиля на метку
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('NFC: функция будет добавлена')),
+  Future<void> _openNfcWrite() async {
+    if (_profileData.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Сначала заполните профиль')),
+      );
+      return;
+    }
+
+    await NfcService.writeProfile(
+      lastName: _profileData.lastName,
+      firstName: _profileData.firstName,
+      birthDate: _profileData.birthDate,
+      height: _profileData.height,
+      weight: _profileData.weight,
+      bloodType: _profileData.bloodType.isNotEmpty
+          ? '${_profileData.bloodType} ${_profileData.rhFactor}'
+          : '',
+      medications: _profileData.medications,
+      allergies: _profileData.allergies,
+      conditions: _profileData.conditions,
+      notes: _profileData.notes,
+      contactName: _profileData.contactName,
+      contactRole: _profileData.contactRole,
+      contactPhone: _profileData.contactPhone,
+      onSuccess: (msg) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+      },
+      onError: (err) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+      },
+    );
+  }
+
+  Future<void> _openNfcRead() async {
+    await NfcService.readTag(
+      onSuccess: (data) {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmergencyScreen(data: data),
+          ),
+        );
+      },
+      onError: (err) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(err)),
+        );
+      },
     );
   }
 
@@ -119,148 +172,138 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
       ),
-      body: ListView(
+      body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
-        children: [
-          const SizedBox(height: 16),
-          _buildProfileCard(),
-          const SizedBox(height: _cardSpacing),
-          _buildDarkCard(
-            label: 'Генератор\nQR-кода',
-            onTap: _openQr,
-          ),
-          const SizedBox(height: _cardSpacing),
-          _buildDarkCard(
-            label: 'Запись на NFC',
-            onTap: _openNfc,
-          ),
-          const SizedBox(height: 120),
-        ],
-      ),
-    );
-  }
-
-  /// Оранжевый блок:
-  /// — имя в левом верхнем углу (top/left: 21)
-  /// — кнопка «Изм.» в правом верхнем углу (top/right: 21)
-  /// — строка дата/рост/вес в левом нижнем углу (bottom/left: 21), fontSize 22
-  Widget _buildProfileCard() {
-    return SizedBox(
-      width: _cardWidth,
-      height: _cardHeight,
-      child: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          color: AppColors.orange,
-          borderRadius: BorderRadius.circular(_borderRadius),
-        ),
-        child: Stack(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Имя — левый верхний угол
-            Positioned(
-              top: _cardPadding,
-              left: _cardPadding,
-              right: 90, // место под кнопку «Изм.»
-              child: Text(
-                _profileData.displayName,
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: _titleFontSize,
-                  fontWeight: FontWeight.w500,
-                  height: _titleLineHeight,
-                  letterSpacing: _letterSpacing,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+            const SizedBox(height: 16),
+            _buildProfileCard(),
+            const SizedBox(height: _cardSpacing),
+            _buildDarkCard(
+              label: 'Записать\nметку',
+              onTap: _openNfcWrite,
             ),
-
-            // Кнопка «Изм.» — правый верхний угол
-            Positioned(
-              top: _cardPadding,
-              right: _cardPadding,
-              child: GestureDetector(
-                onTap: _openEdit,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: const Text(
-                    'Изм.',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: _letterSpacing,
-                    ),
-                  ),
-                ),
-              ),
+            const SizedBox(height: _cardSpacing),
+            _buildDarkCard(
+              label: 'Считать\nметку',
+              onTap: _openNfcRead,
             ),
-
-            // Дата / рост / вес — левый нижний угол
-            if (_profileData.shortInfo.isNotEmpty)
-              Positioned(
-                bottom: _cardPadding,
-                left: _cardPadding,
-                right: _cardPadding,
-                child: Text(
-                  _profileData.shortInfo,
-                  style: const TextStyle(
-                    color: AppColors.white,
-                    fontSize: _infoFontSize,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: _letterSpacing,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
+            const SizedBox(height: _cardSpacing),
+            _buildDarkCard(
+              label: 'Создать\nQR-код',
+              onTap: _openQr,
+              color: const Color(0xFFD1D1D6),
+            ),
+            const SizedBox(height: 16),
           ],
         ),
       ),
     );
   }
 
-  /// Тёмный блок-кнопка — заголовок в левом верхнем углу
+  Widget _buildProfileCard() {
+    return Container(
+      height: _profileCardHeight,
+      decoration: BoxDecoration(
+        color: AppColors.orange,
+        borderRadius: BorderRadius.circular(_borderRadius),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: _cardPadding,
+            left: _cardPadding,
+            right: 90,
+            child: Text(
+              _profileData.displayName,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: _titleFontSize,
+                fontWeight: FontWeight.w500,
+                height: _titleLineHeight,
+                letterSpacing: _letterSpacing,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Positioned(
+            top: _cardPadding,
+            right: _cardPadding,
+            child: GestureDetector(
+              onTap: _openEdit,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: const Text(
+                  'Изм.',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: _letterSpacing,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (_profileData.shortInfo.isNotEmpty)
+            Positioned(
+              bottom: _cardPadding,
+              left: _cardPadding,
+              right: _cardPadding,
+              child: Text(
+                _profileData.shortInfo,
+                style: const TextStyle(
+                  color: AppColors.white,
+                  fontSize: _infoFontSize,
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: _letterSpacing,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDarkCard({
     required String label,
     required VoidCallback onTap,
+    Color color = const Color(0xFF1C1C1E),
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: _cardWidth,
-        height: _cardHeight,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1E),
-            borderRadius: BorderRadius.circular(_borderRadius),
-          ),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Padding(
-              padding: const EdgeInsets.only(
-                top: _cardPadding,
-                left: _cardPadding,
-              ),
-              child: Text(
-                label,
-                style: const TextStyle(
-                  color: AppColors.white,
-                  fontSize: _titleFontSize,
-                  fontWeight: FontWeight.w500,
-                  height: _titleLineHeight,
-                  letterSpacing: _letterSpacing,
-                ),
+      child: Container(
+        height: _buttonCardHeight,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(_borderRadius),
+        ),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(
+              top: _cardPadding,
+              left: _cardPadding,
+            ),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.white,
+                fontSize: _buttonFontSize,
+                fontWeight: FontWeight.w500,
+                height: _buttonLineHeight,
+                letterSpacing: _letterSpacing,
               ),
             ),
           ),

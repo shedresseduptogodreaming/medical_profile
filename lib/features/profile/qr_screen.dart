@@ -21,7 +21,6 @@ class QrScreen extends StatefulWidget {
 class _QrScreenState extends State<QrScreen> {
   final GlobalKey _qrKey = GlobalKey();
 
-  /// Формируем строку данных для QR-кода
   String get _qrData {
     final d = widget.profileData;
     final lines = <String>[
@@ -68,18 +67,6 @@ class _QrScreenState extends State<QrScreen> {
     );
   }
 
-  Future<void> _onDownload() async {
-    final bytes = await _captureQrImage();
-    if (bytes == null) return;
-    // Сохраняем в галерею через image_gallery_saver или просто во временную папку
-    // TODO: подключить image_gallery_saver для сохранения в галерею
-    // await ImageGallerySaver.saveImage(bytes, name: 'qr_profile');
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Скачивание будет доступно после подключения image_gallery_saver')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -87,7 +74,6 @@ class _QrScreenState extends State<QrScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Кнопка закрытия
             Padding(
               padding: const EdgeInsets.only(left: 24, top: 16),
               child: Align(
@@ -113,7 +99,6 @@ class _QrScreenState extends State<QrScreen> {
 
             const Spacer(),
 
-            // QR-код в белой карточке
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: RepaintBoundary(
@@ -144,27 +129,12 @@ class _QrScreenState extends State<QrScreen> {
 
             const Spacer(),
 
-            // Кнопки Поделиться / Скачать
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.ios_share_rounded,
-                      label: 'Поделиться',
-                      onTap: _onShare,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildActionButton(
-                      icon: Icons.download_rounded,
-                      label: 'Скачать',
-                      onTap: _onDownload,
-                    ),
-                  ),
-                ],
+              child: _buildActionButton(
+                icon: Icons.ios_share_rounded,
+                label: 'Поделиться',
+                onTap: _onShare,
               ),
             ),
           ],
@@ -181,16 +151,17 @@ class _QrScreenState extends State<QrScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, color: Colors.black, size: 24),
-            const SizedBox(height: 6),
+            const SizedBox(width: 8),
             Text(
               label,
               style: const TextStyle(

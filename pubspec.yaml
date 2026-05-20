@@ -40,7 +40,7 @@ dependencies:
   qr_flutter: ^4.1.0          # QR-код
   share_plus: ^12.0.2           # Поделиться
   path_provider: ^2.1.0        # Временный файл для шаринга
-  image_gallery_saver: ^2.0.3  # Скачать в галерею (для _onDownload)
+  # image_gallery_saver: ^2.0.3  # Скачать в галерею (для _onDownload)
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
