@@ -35,8 +35,8 @@ class _QrScreenState extends State<QrScreen> {
       if (d.allergies.isNotEmpty) 'Аллергии: ${d.allergies}',
       if (d.conditions.isNotEmpty) 'Заболевания: ${d.conditions}',
       if (d.notes.isNotEmpty) 'Заметки: ${d.notes}',
-      if (d.contactName.isNotEmpty)
-        'Контакт (${d.contactRole}): ${d.contactName} ${d.contactPhone}',
+      if (d.contactPhone.isNotEmpty)
+        '${d.contactRole}: тел: ${d.contactPhone}',
     ];
     return lines.isEmpty ? 'Профиль не заполнен' : lines.join('\n');
   }
@@ -74,6 +74,7 @@ class _QrScreenState extends State<QrScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Кнопка закрыть
             Padding(
               padding: const EdgeInsets.only(left: 24, top: 16),
               child: Align(
@@ -99,6 +100,7 @@ class _QrScreenState extends State<QrScreen> {
 
             const Spacer(),
 
+            // QR-код
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: RepaintBoundary(
@@ -109,18 +111,20 @@ class _QrScreenState extends State<QrScreen> {
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: QrImageView(
-                    data: _qrData,
-                    version: QrVersions.auto,
-                    size: double.infinity,
-                    backgroundColor: AppColors.white,
-                    eyeStyle: const QrEyeStyle(
-                      eyeShape: QrEyeShape.square,
-                      color: Colors.black,
-                    ),
-                    dataModuleStyle: const QrDataModuleStyle(
-                      dataModuleShape: QrDataModuleShape.square,
-                      color: Colors.black,
+                  child: Center(
+                    child: QrImageView(
+                      data: _qrData.isEmpty ? 'placeholder' : _qrData,
+                      version: QrVersions.auto,
+                      size: 260,
+                      backgroundColor: AppColors.white,
+                      eyeStyle: const QrEyeStyle(
+                        eyeShape: QrEyeShape.square,
+                        color: Colors.black,
+                      ),
+                      dataModuleStyle: const QrDataModuleStyle(
+                        dataModuleShape: QrDataModuleShape.square,
+                        color: Colors.black,
+                      ),
                     ),
                   ),
                 ),
@@ -129,6 +133,7 @@ class _QrScreenState extends State<QrScreen> {
 
             const Spacer(),
 
+            // Кнопки Поделиться и Скачать
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
               child: _buildActionButton(
@@ -151,7 +156,6 @@ class _QrScreenState extends State<QrScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
           color: AppColors.white,
@@ -160,7 +164,7 @@ class _QrScreenState extends State<QrScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: Colors.black, size: 24),
+            Icon(icon, color: Colors.black, size: 22),
             const SizedBox(width: 8),
             Text(
               label,
