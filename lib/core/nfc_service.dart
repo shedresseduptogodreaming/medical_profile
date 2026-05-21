@@ -74,6 +74,13 @@ class NfcService {
             return;
           }
 
+          // Очищаем метку перед записью новых данных
+          try {
+            await ndef.write(NdefMessage([]));
+          } catch (_) {
+            // Некоторые метки не принимают пустое сообщение — продолжаем
+          }
+
           await ndef.write(message);
           await NfcManager.instance.stopSession(
             alertMessage: 'Данные успешно записаны ✓',

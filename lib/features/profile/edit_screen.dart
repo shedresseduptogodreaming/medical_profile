@@ -7,7 +7,15 @@ import 'profile_screen.dart';
 class EditScreen extends StatefulWidget {
   final ProfileData initialData;
 
-  const EditScreen({super.key, required this.initialData});
+  /// true — первый вход (профиль пустой), поля сразу разблокированы.
+  /// false — повторный вход, поля заблокированы до нажатия «Изм.».
+  final bool isNewProfile;
+
+  const EditScreen({
+    super.key,
+    required this.initialData,
+    this.isNewProfile = false,
+  });
 
   @override
   State<EditScreen> createState() => _EditScreenState();
@@ -32,8 +40,10 @@ class _EditScreenState extends State<EditScreen> {
   String? _selectedRhFactor;
   EmergencyContact? _emergencyContact;
 
-  /// Режим редактирования — изначально false (поля заблокированы)
-  bool _isEditing = false;
+  /// Режим редактирования:
+  /// — при первом входе (isNewProfile == true) сразу true
+  /// — при повторном входе изначально false
+  late bool _isEditing;
 
   String? _lastNameError;
   String? _firstNameError;
@@ -56,6 +66,9 @@ class _EditScreenState extends State<EditScreen> {
   @override
   void initState() {
     super.initState();
+    // Поля сразу открыты только при первом создании профиля
+    _isEditing = widget.isNewProfile;
+
     final d = widget.initialData;
     _lastNameController = TextEditingController(text: d.lastName);
     _firstNameController = TextEditingController(text: d.firstName);
@@ -93,14 +106,58 @@ class _EditScreenState extends State<EditScreen> {
     super.dispose();
   }
 
+  /// Возвращает максимальное число дней в месяце с учётом года.
+  int _maxDayInMonth(int month, int year) {
+    if (month == 2) {
+      final isLeap = (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
+      return isLeap ? 29 : 28;
+    }
+    const days30 = [4, 6, 9, 11];
+    return days30.contains(month) ? 30 : 31;
+  }
+
   void _formatDate(String value) {
     String digits = value.replaceAll(RegExp(r'\D'), '');
     if (digits.length > 8) digits = digits.substring(0, 8);
+
+    // Ограничиваем день (первые 2 цифры): 01–31
+    if (digits.length >= 2) {
+      int day = int.tryParse(digits.substring(0, 2)) ?? 0;
+      if (day < 1) day = 1;
+      if (day > 31) day = 31;
+      digits = day.toString().padLeft(2, '0') + digits.substring(2);
+    }
+
+    // Ограничиваем месяц (цифры 3–4): 01–12
+    if (digits.length >= 4) {
+      int month = int.tryParse(digits.substring(2, 4)) ?? 0;
+      if (month < 1) month = 1;
+      if (month > 12) month = 12;
+      digits = digits.substring(0, 2) + month.toString().padLeft(2, '0') + digits.substring(4);
+    }
+
+    // Ограничиваем год (цифры 5–8): 1900–2026
+    if (digits.length == 8) {
+      int year = int.tryParse(digits.substring(4, 8)) ?? 1900;
+      if (year < 1900) year = 1900;
+      if (year > 2026) year = 2026;
+      digits = digits.substring(0, 4) + year.toString().padLeft(4, '0');
+
+      // Финальная проверка: день не превышает максимум для месяца/года
+      int day = int.tryParse(digits.substring(0, 2)) ?? 1;
+      int month = int.tryParse(digits.substring(2, 4)) ?? 1;
+      final maxDay = _maxDayInMonth(month, year);
+      if (day > maxDay) day = maxDay;
+      digits = day.toString().padLeft(2, '0') + digits.substring(2);
+    }
+
+    // Форматируем с точками: ДД.ММ.ГГГГ
     String formatted = '';
     for (int i = 0; i < digits.length; i++) {
       if (i == 2 || i == 4) formatted += '.';
       formatted += digits[i];
     }
+
     _birthDateController.value = TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
@@ -115,10 +172,14 @@ class _EditScreenState extends State<EditScreen> {
       );
       return;
     }
-    final formatted = '$digits см';
+    int h = int.tryParse(digits) ?? 0;
+    if (h > 250) h = 250;
+    if (h < 1) h = 1;
+    final hStr = h.toString();
+    final formatted = '$hStr см';
     _heightController.value = TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: digits.length),
+      selection: TextSelection.collapsed(offset: hStr.length),
     );
   }
 
@@ -130,10 +191,14 @@ class _EditScreenState extends State<EditScreen> {
       );
       return;
     }
-    final formatted = '$digits кг';
+    int w = int.tryParse(digits) ?? 0;
+    if (w > 300) w = 300;
+    if (w < 1) w = 1;
+    final wStr = w.toString();
+    final formatted = '$wStr кг';
     _weightController.value = TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: digits.length),
+      selection: TextSelection.collapsed(offset: wStr.length),
     );
   }
 
@@ -153,16 +218,40 @@ class _EditScreenState extends State<EditScreen> {
     if (_middleNameError != null) isValid = false;
 
     final dateDigits = _birthDateController.text.replaceAll(RegExp(r'\D'), '');
-    _birthDateError = dateDigits.length < 8
-        ? 'Введите полную дату рождения' : null;
+    if (dateDigits.length < 8) {
+      _birthDateError = 'Введите полную дату рождения';
+    } else {
+      final day = int.tryParse(dateDigits.substring(0, 2)) ?? 0;
+      final month = int.tryParse(dateDigits.substring(2, 4)) ?? 0;
+      final year = int.tryParse(dateDigits.substring(4, 8)) ?? 0;
+      if (month < 1 || month > 12) {
+        _birthDateError = 'Неверный месяц (01–12)';
+      } else if (year < 1900 || year > 2026) {
+        _birthDateError = 'Неверный год (1900–2026)';
+      } else if (day < 1 || day > _maxDayInMonth(month, year)) {
+        _birthDateError = 'Неверный день для указанного месяца';
+      } else {
+        _birthDateError = null;
+      }
+    }
     if (_birthDateError != null) isValid = false;
 
     final heightDigits = _heightController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    _heightError = heightDigits.isEmpty ? 'Поле обязательно к заполнению' : null;
+    if (heightDigits.isEmpty) {
+      _heightError = 'Поле обязательно к заполнению';
+    } else {
+      final h = int.tryParse(heightDigits) ?? 0;
+      _heightError = (h < 1 || h > 250) ? 'Рост: 1–250 см' : null;
+    }
     if (_heightError != null) isValid = false;
 
     final weightDigits = _weightController.text.replaceAll(RegExp(r'[^0-9]'), '');
-    _weightError = weightDigits.isEmpty ? 'Поле обязательно к заполнению' : null;
+    if (weightDigits.isEmpty) {
+      _weightError = 'Поле обязательно к заполнению';
+    } else {
+      final w = int.tryParse(weightDigits) ?? 0;
+      _weightError = (w < 1 || w > 300) ? 'Вес: 1–300 кг' : null;
+    }
     if (_weightError != null) isValid = false;
 
     _contactError = _emergencyContact == null
@@ -352,19 +441,23 @@ class _EditScreenState extends State<EditScreen> {
             child: GestureDetector(
               onTap: _onActionTap,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                // Размер кнопки: высота 42, ширина 85
+                width: 85,
+                height: 42,
+                alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: AppColors.orange,
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: _isEditing
-                    ? const Icon(Icons.check_rounded, color: AppColors.white, size: 20)
+                    ? const Icon(Icons.check_rounded, color: AppColors.white, size: 24)
                     : const Text(
                         'Изм.',
                         style: TextStyle(
                           color: AppColors.white,
-                          fontSize: 14,
+                          fontSize: 22,
                           fontWeight: FontWeight.w600,
+                          letterSpacing: -1,
                         ),
                       ),
               ),

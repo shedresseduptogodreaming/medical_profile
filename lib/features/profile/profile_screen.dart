@@ -77,13 +77,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const double _titleLineHeight = 46 / 40;
   static const double _buttonLineHeight = 36 / 30;
   static const double _borderRadius = 20;
-  static const double _letterSpacing = -2;
+  static const double _letterSpacing = -1;
 
   Future<void> _openEdit() async {
     final result = await Navigator.push<ProfileData>(
       context,
       MaterialPageRoute(
-        builder: (_) => EditScreen(initialData: _profileData),
+        builder: (_) => EditScreen(
+          initialData: _profileData,
+          isNewProfile: _profileData.isEmpty,
+        ),
       ),
     );
     if (result != null) {
