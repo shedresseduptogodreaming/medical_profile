@@ -3,6 +3,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_logo.dart';
 import 'profile_screen.dart';
+import '../../../models/user_profile.dart';
 
 class EditScreen extends StatefulWidget {
   final ProfileData initialData;
@@ -86,7 +87,7 @@ class _EditScreenState extends State<EditScreen> {
       _emergencyContact = EmergencyContact(
         name: d.contactName,
         phone: d.contactPhone,
-        role: d.contactRole,
+        relation: d.contactRole,
       );
     }
   }
@@ -294,7 +295,7 @@ class _EditScreenState extends State<EditScreen> {
             notes: _notesController.text.trim(),
             contactName: _emergencyContact?.name ?? '',
             contactPhone: _emergencyContact?.phone ?? '',
-            contactRole: _emergencyContact?.role ?? '',
+            contactRole: _emergencyContact?.relation ?? '',
           );
           Navigator.pop(context, data);
         }
@@ -399,7 +400,7 @@ class _EditScreenState extends State<EditScreen> {
                         onTap: () {
                           setState(() {
                             _emergencyContact = EmergencyContact(
-                              name: name, phone: phone, role: role,
+                              name: name, phone: phone, relation: role,
                             );
                             _contactError = null;
                           });
@@ -552,12 +553,12 @@ class _EditScreenState extends State<EditScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _emergencyContact!.role.toLowerCase(),
-                        style: AppTextStyles.fieldHint.copyWith(fontSize: 12),
+                        _emergencyContact!.relation.toLowerCase(),
+                        style: AppTextStyles.fieldHint.copyWith(fontSize: 20),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 4),
                       Text(_emergencyContact!.name, style: AppTextStyles.fieldText),
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 4),
                       Text(_emergencyContact!.phone, style: AppTextStyles.fieldHint),
                     ],
                   ),
@@ -719,15 +720,3 @@ class _EditScreenState extends State<EditScreen> {
   }
 }
 
-// Переносим сюда из profile_screen.dart для избежания дублирования импортов
-class EmergencyContact {
-  final String name;
-  final String phone;
-  final String role;
-
-  const EmergencyContact({
-    required this.name,
-    required this.phone,
-    required this.role,
-  });
-}

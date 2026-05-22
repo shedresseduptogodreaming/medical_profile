@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/nfc_service.dart';
+import '../../../core/auth_service.dart';
+import '../../../models/user_profile.dart';
 import 'edit_screen.dart';
 import 'qr_screen.dart';
 import '../emergency/emergency_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileData {
   final String lastName;
@@ -49,11 +52,7 @@ class ProfileData {
   }
 
   String get shortInfo {
-    final parts = <String>[];
-    if (birthDate.isNotEmpty) parts.add(birthDate);
-    if (height.isNotEmpty) parts.add(height);
-    if (weight.isNotEmpty) parts.add(weight);
-    return parts.join(' / ');
+    return birthDate.isNotEmpty ? birthDate : '';
   }
 }
 
@@ -66,6 +65,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   ProfileData _profileData = const ProfileData();
+  bool _isLoading = true;
 
   static const double _profileCardHeight = 173;
   static const double _buttonCardHeight = 130;
@@ -79,6 +79,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
   static const double _borderRadius = 20;
   static const double _letterSpacing = -1;
 
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    String? uid = AuthService.currentUser?.id;
+    
+    // Если не Supabase пользователь — проверяем яндекс uid
+    if (uid == null) {
+      final prefs = await SharedPreferences.getInstance();
+      uid = prefs.getString('yandex_uid');
+    }
+    
+    if (uid == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+  
+    final profile = await AuthService.getProfile(uid);
+    if (profile != null && mounted) {
+      setState(() {
+        _profileData = ProfileData(
+          lastName: profile.lastName,
+          firstName: profile.firstName,
+          middleName: profile.middleName,
+          birthDate: profile.birthDate != null
+              ? '${profile.birthDate!.day.toString().padLeft(2, '0')}.${profile.birthDate!.month.toString().padLeft(2, '0')}.${profile.birthDate!.year}'
+              : '',
+          height: profile.height != null
+              ? '${profile.height!.toStringAsFixed(0)} см'
+              : '',
+          weight: profile.weight != null
+              ? '${profile.weight!.toStringAsFixed(0)} кг'
+              : '',
+          bloodType: profile.bloodType,
+          rhFactor: profile.rhFactor,
+          medications: profile.medications.join(', '),
+          allergies: profile.allergies.join(', '),
+          conditions: profile.conditions.join(', '),
+          notes: profile.notes,
+          contactName: profile.emergencyContacts.isNotEmpty
+              ? profile.emergencyContacts.first.name : '',
+          contactPhone: profile.emergencyContacts.isNotEmpty
+              ? profile.emergencyContacts.first.phone : '',
+          contactRole: profile.emergencyContacts.isNotEmpty
+              ? profile.emergencyContacts.first.relation : '',
+        );
+        _isLoading = false;
+      });
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveProfile(ProfileData data) async {
+    final uid = AuthService.currentUser?.id;
+    if (uid == null) return;
+
+    final profile = UserProfile(
+      uid: uid,
+      lastName: data.lastName,
+      firstName: data.firstName,
+      middleName: data.middleName,
+      birthDate: data.birthDate.isNotEmpty
+          ? DateTime.tryParse(
+              data.birthDate.split('.').reversed.join('-'))
+          : null,
+      height: double.tryParse(data.height.replaceAll(RegExp(r'[^0-9]'), '')),
+      weight: double.tryParse(data.weight.replaceAll(RegExp(r'[^0-9]'), '')),
+      bloodType: data.bloodType,
+      rhFactor: data.rhFactor,
+      medications: data.medications.isNotEmpty
+          ? data.medications.split(',').map((e) => e.trim()).toList()
+          : [],
+      allergies: data.allergies.isNotEmpty
+          ? data.allergies.split(',').map((e) => e.trim()).toList()
+          : [],
+      conditions: data.conditions.isNotEmpty
+          ? data.conditions.split(',').map((e) => e.trim()).toList()
+          : [],
+      notes: data.notes,
+      emergencyContacts: data.contactName.isNotEmpty
+          ? [
+              EmergencyContact(
+                name: data.contactName,
+                phone: data.contactPhone,
+                relation: data.contactRole,
+              )
+            ]
+          : [],
+    );
+
+    await AuthService.saveProfile(profile);
+  }
+
   Future<void> _openEdit() async {
     final result = await Navigator.push<ProfileData>(
       context,
@@ -91,6 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     if (result != null) {
       setState(() => _profileData = result);
+      await _saveProfile(result);
     }
   }
 
@@ -175,33 +273,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: false,
         automaticallyImplyLeading: false,
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 16),
-            _buildProfileCard(),
-            const SizedBox(height: _cardSpacing),
-            _buildDarkCard(
-              label: 'Записать\nметку',
-              onTap: _openNfcWrite,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16),
+                  _buildProfileCard(),
+                  const SizedBox(height: _cardSpacing),
+                  _buildDarkCard(
+                    label: 'Записать\nметку',
+                    onTap: _openNfcWrite,
+                  ),
+                  const SizedBox(height: _cardSpacing),
+                  _buildDarkCard(
+                    label: 'Считать\nметку',
+                    onTap: _openNfcRead,
+                  ),
+                  const SizedBox(height: _cardSpacing),
+                  _buildDarkCard(
+                    label: 'Создать\nQR-код',
+                    onTap: _openQr,
+                    color: const Color(0xFFD1D1D6),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
-            const SizedBox(height: _cardSpacing),
-            _buildDarkCard(
-              label: 'Считать\nметку',
-              onTap: _openNfcRead,
-            ),
-            const SizedBox(height: _cardSpacing),
-            _buildDarkCard(
-              label: 'Создать\nQR-код',
-              onTap: _openQr,
-              color: const Color(0xFFD1D1D6),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
     );
   }
 

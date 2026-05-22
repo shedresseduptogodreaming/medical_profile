@@ -1,38 +1,36 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme.dart';
-import '../../../core/widgets/app_logo.dart';
-import '../../../core/auth_service.dart';
-import '../home/home_screen.dart';
+import '../../core/theme.dart';
+import '../../core/auth_service.dart';
+import 'login_screen.dart';
 
-class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+class ResetPasswordScreen extends StatefulWidget {
+  final String email;
+
+  const ResetPasswordScreen({super.key, required this.email});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
-  final _emailController = TextEditingController();
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _otpController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  bool _passwordVisible = false;
-  bool _confirmPasswordVisible = false;
-  bool _isLoading = false;
 
-  String? _emailError;
+  String? _otpError;
   String? _passwordError;
   String? _confirmPasswordError;
 
+  bool _isLoading = false;
+  bool _passwordVisible = false;
+  bool _confirmPasswordVisible = false;
+
   @override
   void dispose() {
-    _emailController.dispose();
+    _otpController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
-  }
-
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
   bool _isValidPassword(String password) {
@@ -42,71 +40,62 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password.contains(RegExp(r'[0-9]'));
   }
 
-  bool _runValidation() {
-    bool isValid = true;
-
-    if (_emailController.text.isEmpty) {
-      _emailError = 'Введите email';
-      isValid = false;
-    } else if (!_isValidEmail(_emailController.text)) {
-      _emailError = 'Некорректный email';
-      isValid = false;
-    } else {
-      _emailError = null;
-    }
-
-    if (_passwordController.text.isEmpty) {
-      _passwordError = 'Введите пароль';
-      isValid = false;
-    } else if (!_isValidPassword(_passwordController.text)) {
-      _passwordError = 'Минимум 8 символов, заглавные и строчные буквы, цифры';
-      isValid = false;
-    } else {
-      _passwordError = null;
-    }
-
-    if (_confirmPasswordController.text.isEmpty) {
-      _confirmPasswordError = 'Подтвердите пароль';
-      isValid = false;
-    } else if (_confirmPasswordController.text != _passwordController.text) {
-      _confirmPasswordError = 'Пароли не совпадают';
-      isValid = false;
-    } else {
-      _confirmPasswordError = null;
-    }
-
-    return isValid;
-  }
-
   Future<void> _submit() async {
-    setState(() {});
-    final valid = _runValidation();
-    setState(() {});
+    final otp = _otpController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmPasswordController.text;
 
-    if (!valid) return;
+    setState(() {
+      if (otp.isEmpty) {
+        _otpError = 'Введите код из письма';
+      } else if (otp.length != 6 || int.tryParse(otp) == null) {
+        _otpError = 'Код должен содержать 6 цифр';
+      } else {
+        _otpError = null;
+      }
+
+      if (password.isEmpty) {
+        _passwordError = 'Введите новый пароль';
+      } else if (!_isValidPassword(password)) {
+        _passwordError = 'Минимум 8 символов, заглавные и строчные буквы, цифры';
+      } else {
+        _passwordError = null;
+      }
+
+      if (confirm.isEmpty) {
+        _confirmPasswordError = 'Подтвердите пароль';
+      } else if (confirm != password) {
+        _confirmPasswordError = 'Пароли не совпадают';
+      } else {
+        _confirmPasswordError = null;
+      }
+    });
+
+    if (_otpError != null || _passwordError != null || _confirmPasswordError != null) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await AuthService.register(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+      await AuthService.verifyOtpAndResetPassword(
+        email: widget.email,
+        otp: otp,
+        newPassword: password,
       );
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-        );
-      }
-    } on Exception catch (e) {
-      print('REGISTER ERROR: $e');
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+        (route) => false,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Пароль успешно изменён')),
+      );
+    } catch (e) {
       setState(() {
-        _emailError = e.toString().contains('email-already-in-use')
-            ? 'Этот email уже зарегистрирован'
-            : 'Ошибка регистрации. Попробуйте снова';
+        _otpError = 'Неверный или истёкший код';
       });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
   }
 
@@ -119,30 +108,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
         backgroundColor: AppColors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
-        titleSpacing: 0,
-        title: const AppLogo(),
-        centerTitle: false,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 32),
-            Text('Регистрация', style: AppTextStyles.heading),
+            const SizedBox(height: 16),
+            Text('Новый пароль', style: AppTextStyles.heading),
+            const SizedBox(height: 12),
+            Text(
+              'Введите код из письма и придумайте новый пароль',
+              style: AppTextStyles.subtitle,
+            ),
             const SizedBox(height: 32),
             _buildTextField(
-              controller: _emailController,
-              hint: 'Email',
-              keyboardType: TextInputType.emailAddress,
-              error: _emailError,
-              onChanged: (_) => setState(() => _emailError = null),
+              controller: _otpController,
+              hint: 'Код из письма',
+              keyboardType: TextInputType.number,
+              error: _otpError,
+              onChanged: (_) => setState(() => _otpError = null),
             ),
             const SizedBox(height: 16),
             _buildTextField(
               controller: _passwordController,
-              hint: 'Пароль',
+              hint: 'Новый пароль',
               obscure: !_passwordVisible,
               error: _passwordError,
               onChanged: (_) => setState(() => _passwordError = null),
@@ -186,8 +180,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text('Зарегистрироваться', style: AppTextStyles.buttonText),
+                    ? const CircularProgressIndicator(color: AppColors.white)
+                    : Text('Сменить пароль', style: AppTextStyles.buttonText),
               ),
             ),
             const SizedBox(height: 32),
@@ -202,8 +196,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hint,
     bool obscure = false,
     TextInputType keyboardType = TextInputType.text,
-    Widget? suffix,
     String? error,
+    Widget? suffix,
     ValueChanged<String>? onChanged,
   }) {
     return Column(
@@ -233,10 +227,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
         if (error != null) ...[
           const SizedBox(height: 6),
-          Text(
-            error,
-            style: AppTextStyles.fieldHint.copyWith(fontSize: 12),
-          ),
+          Text(error, style: AppTextStyles.fieldHint.copyWith(fontSize: 20)),
         ],
       ],
     );
