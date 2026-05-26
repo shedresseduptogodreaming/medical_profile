@@ -21,24 +21,84 @@ class QrScreen extends StatefulWidget {
 class _QrScreenState extends State<QrScreen> {
   final GlobalKey _qrKey = GlobalKey();
 
+  // ============================================================
+// ПАТЧ v2 для lib/features/profile/qr_screen.dart
+// Заменить метод _qrData целиком (внутри класса _QrScreenState)
+// ============================================================
+
   String get _qrData {
     final d = widget.profileData;
+
+    // Пустой профиль
+    if (d.lastName.isEmpty && d.firstName.isEmpty) {
+      return 'Профиль не заполнен';
+    }
+
+    // --- Имя (без отчества) ---
+    final fn = '${d.lastName} ${d.firstName}'.trim();
+    final n  = '${d.lastName};${d.firstName};;;';
+
+    // --- Дата рождения: DD.MM.YYYY → YYYY-MM-DD ---
+    // Формат с дефисами работает корректно и на iOS и на Android
+    String bday = '';
+    if (d.birthDate.isNotEmpty) {
+      final parts = d.birthDate.split('.');
+      if (parts.length == 3) {
+        bday = '${parts[2]}-${parts[1].padLeft(2, '0')}-${parts[0].padLeft(2, '0')}';
+      } else {
+        bday = d.birthDate;
+      }
+    }
+
+    // --- Телефон: убираем пробелы, скобки, дефисы ---
+    final rawPhone = d.contactPhone.replaceAll(RegExp(r'[\s\(\)\-]'), '');
+
+    // --- NOTE: медданные + имя контакта ---
+    // iOS показывает NOTE только после нажатия "Добавить контакт" — это ограничение Apple
+    // Android показывает NOTE сразу в превью
+    final noteLines = <String>[];
+    if (d.bloodType.isNotEmpty || d.rhFactor.isNotEmpty) {
+      noteLines.add('Группа крови: ${d.bloodType} ${d.rhFactor}'.trim());
+    }
+    if (d.allergies.isNotEmpty)   noteLines.add('Аллергии: ${d.allergies}');
+    if (d.medications.isNotEmpty) noteLines.add('Лекарства: ${d.medications}');
+    if (d.conditions.isNotEmpty)  noteLines.add('Болезни: ${d.conditions}');
+    if (d.height.isNotEmpty)      noteLines.add('Рост: ${d.height}');
+    if (d.weight.isNotEmpty)      noteLines.add('Вес: ${d.weight}');
+    if (d.notes.isNotEmpty)       noteLines.add('Заметки: ${d.notes}');
+    if (d.contactName.isNotEmpty) {
+      final label = d.contactRole.isNotEmpty ? d.contactRole : 'Контакт';
+      noteLines.add('$label: ${d.contactName}');
+    }
+
+    // Переносы строк внутри NOTE экранируются как \n (литерально)
+    final note = noteLines.join('\\n');
+
+    // --- Телефон экстренного контакта с подписью роли ---
+    // type=ROLE — Android показывает подпись рядом с номером
+    String contactTel = '';
+    if (rawPhone.isNotEmpty) {
+      if (d.contactRole.isNotEmpty) {
+        contactTel = 'TEL;type=${d.contactRole}:$rawPhone';
+      } else {
+        contactTel = 'TEL;type=CELL:$rawPhone';
+      }
+    }
+
+    // --- Сборка vCard 3.0 ---
+    // \r\n — стандартный разделитель строк в vCard
     final lines = <String>[
-      if (d.lastName.isNotEmpty || d.firstName.isNotEmpty)
-        '${d.lastName} ${d.firstName} ${d.middleName}'.trim(),
-      if (d.birthDate.isNotEmpty) 'ДР: ${d.birthDate}',
-      if (d.height.isNotEmpty) 'Рост: ${d.height}',
-      if (d.weight.isNotEmpty) 'Вес: ${d.weight}',
-      if (d.bloodType.isNotEmpty || d.rhFactor.isNotEmpty)
-        'Кровь: ${d.bloodType} ${d.rhFactor}'.trim(),
-      if (d.medications.isNotEmpty) 'Лекарства: ${d.medications}',
-      if (d.allergies.isNotEmpty) 'Аллергии: ${d.allergies}',
-      if (d.conditions.isNotEmpty) 'Заболевания: ${d.conditions}',
-      if (d.notes.isNotEmpty) 'Заметки: ${d.notes}',
-      if (d.contactPhone.isNotEmpty)
-        '${d.contactRole}: тел: ${d.contactPhone}',
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      'FN:$fn',
+      'N:$n',
+      if (bday.isNotEmpty)       'BDAY:$bday',
+      if (contactTel.isNotEmpty) contactTel,
+      if (note.isNotEmpty)       'NOTE:$note',
+      'END:VCARD',
     ];
-    return lines.isEmpty ? 'Профиль не заполнен' : lines.join('\n');
+
+    return lines.join('\r\n');
   }
 
   Future<Uint8List?> _captureQrImage() async {
@@ -105,17 +165,18 @@ class _QrScreenState extends State<QrScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 32),
               child: RepaintBoundary(
                 key: _qrKey,
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
+                child: AspectRatio(
+                  aspectRatio: 1.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
                     child: QrImageView(
-                      data: _qrData.isEmpty ? 'placeholder' : _qrData,
+                      data: _qrData,
                       version: QrVersions.auto,
-                      size: 260,
+                      size: double.infinity,
                       backgroundColor: AppColors.white,
                       eyeStyle: const QrEyeStyle(
                         eyeShape: QrEyeShape.square,
