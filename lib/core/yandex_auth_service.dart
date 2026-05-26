@@ -1,6 +1,8 @@
-import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:app_links/app_links.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'auth_service.dart';
 
 class YandexAuthService {
@@ -15,12 +17,20 @@ class YandexAuthService {
           '&client_id=$_clientId'
           '&redirect_uri=${Uri.encodeComponent(_redirectUri)}';
 
-      final result = await FlutterWebAuth2.authenticate(
-        url: url,
-        callbackUrlScheme: 'com.nastya.medicalprofile',
+      // Открываем браузер
+      await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
       );
 
-      final code = Uri.parse(result).queryParameters['code'];
+      // Ждём редирект через app_links
+      final appLinks = AppLinks();
+      final redirectUri = await appLinks.uriLinkStream
+          .where((uri) => uri.scheme == 'com.nastya.medicalprofile')
+          .first
+          .timeout(const Duration(minutes: 5));
+
+      final code = redirectUri.queryParameters['code'];
       if (code == null) return null;
 
       // Получаем токен
@@ -39,7 +49,7 @@ class YandexAuthService {
       final accessToken = tokenData['access_token'];
       if (accessToken == null) return null;
 
-      // Получаем данные пользователя от Яндекса
+      // Получаем данные пользователя
       final userResponse = await http.get(
         Uri.parse('https://login.yandex.ru/info?format=json'),
         headers: {'Authorization': 'OAuth $accessToken'},
@@ -53,7 +63,11 @@ class YandexAuthService {
 
       if (yandexUid == null) return null;
 
-      // Сохраняем в Supabase если новый пользователь
+      // Сохраняем uid в SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('yandex_uid', yandexUid);
+
+      // Сохраняем в Supabase
       await AuthService.saveYandexProfile(
         yandexUid: yandexUid,
         email: email,
@@ -61,7 +75,6 @@ class YandexAuthService {
         lastName: lastName,
       );
 
-      // Возвращаем данные чтобы приложение знало uid
       return {
         ...tokenData,
         'uid': yandexUid,

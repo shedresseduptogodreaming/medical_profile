@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/app_logo.dart';
 import 'profile_screen.dart';
 import '../../../models/user_profile.dart';
-import '../auth/auth_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../auth/auth_screen.dart';
 
 class EditScreen extends StatefulWidget {
@@ -569,6 +569,9 @@ class _EditScreenState extends State<EditScreen> {
 
                 if (confirm == true && context.mounted) {
                   await Supabase.instance.client.auth.signOut();
+
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('yandex_uid');
 
                   if (context.mounted) {
                     Navigator.pushAndRemoveUntil(

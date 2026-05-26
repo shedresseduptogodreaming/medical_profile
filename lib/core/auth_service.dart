@@ -4,7 +4,6 @@ import '../models/user_profile.dart';
 class AuthService {
   static final _client = Supabase.instance.client;
 
-  // Текущий пользователь
   static User? get currentUser => _client.auth.currentUser;
   static Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
@@ -21,7 +20,10 @@ class AuthService {
     if (uid == null) return null;
 
     final profile = UserProfile(uid: uid);
-    await _client.from('users').insert(profile.toMap());
+    await _client.from('users').upsert(
+      profile.toMap(),
+      onConflict: 'uid', // ✅
+    );
     return profile;
   }
 
@@ -59,7 +61,10 @@ class AuthService {
   static Future<void> saveProfile(UserProfile profile) async {
     await _client
         .from('users')
-        .upsert(profile.toMap());
+        .upsert(
+          profile.toMap(),
+          onConflict: 'uid', // ✅
+        );
   }
 
   // ─── Яндекс: сохранить профиль ────────────────────────
@@ -69,14 +74,22 @@ class AuthService {
     String? name,
     String? lastName,
   }) async {
+    // ✅ Проверяем — если профиль уже есть, не перезаписываем имя/фамилию
+    final existing = await getProfile(yandexUid);
+    if (existing != null) return; // профиль уже есть — не трогаем
+
     final profile = UserProfile(
       uid: yandexUid,
       firstName: name ?? '',
       lastName: lastName ?? '',
     );
-    await _client.from('users').upsert(profile.toMap());
+    await _client.from('users').upsert(
+      profile.toMap(),
+      onConflict: 'uid', // ✅
+    );
   }
-    // ─── Отправить OTP для сброса пароля ──────────────────
+
+  // ─── Отправить OTP для сброса пароля ──────────────────
   static Future<void> sendPasswordResetOtp(String email) async {
     await _client.auth.signInWithOtp(
       email: email,
@@ -100,4 +113,4 @@ class AuthService {
       UserAttributes(password: newPassword),
     );
   }
-  }
+}

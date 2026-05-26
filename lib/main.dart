@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
 
@@ -13,9 +14,17 @@ void main() async {
     ),
   );
 
-  final session = Supabase.instance.client.auth.currentSession;
+  // Проверяем Supabase сессию (обычный вход)
+  final Session? supabaseSession = Supabase.instance.client.auth.currentSession;
 
-  runApp(MyApp(isLoggedIn: session != null));
+  // Проверяем Яндекс uid (яндекс вход)
+  bool isLoggedIn = supabaseSession != null;
+  if (!isLoggedIn) {
+    final prefs = await SharedPreferences.getInstance();
+    isLoggedIn = prefs.getString('yandex_uid') != null;
+  }
+
+  runApp(MyApp(isLoggedIn: isLoggedIn));
 }
 
 class MyApp extends StatelessWidget {

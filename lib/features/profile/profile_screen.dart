@@ -85,20 +85,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
+  // ✅ ИСПРАВЛЕНО: берём uid из Supabase ИЛИ из SharedPreferences (Яндекс)
+  Future<String?> _getCurrentUid() async {
+    final supabaseUid = AuthService.currentUser?.id;
+    if (supabaseUid != null) return supabaseUid;
+
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('yandex_uid');
+  }
+
   Future<void> _loadProfile() async {
-    String? uid = AuthService.currentUser?.id;
-    
-    // Если не Supabase пользователь — проверяем яндекс uid
-    if (uid == null) {
-      final prefs = await SharedPreferences.getInstance();
-      uid = prefs.getString('yandex_uid');
-    }
-    
+    final uid = await _getCurrentUid();
+
     if (uid == null) {
       setState(() => _isLoading = false);
       return;
     }
-  
+
     final profile = await AuthService.getProfile(uid);
     if (profile != null && mounted) {
       setState(() {
@@ -135,8 +138,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ✅ ИСПРАВЛЕНО: берём uid из обоих источников
   Future<void> _saveProfile(ProfileData data) async {
-    final uid = AuthService.currentUser?.id;
+    final uid = await _getCurrentUid();
     if (uid == null) return;
 
     final profile = UserProfile(
