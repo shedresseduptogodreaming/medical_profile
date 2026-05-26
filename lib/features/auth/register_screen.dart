@@ -93,9 +93,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         password: _passwordController.text,
       );
       if (mounted) {
-        Navigator.pushReplacement(
+        // ✅ ИСПРАВЛЕНО: очищаем весь стек
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
         );
       }
     } on Exception catch (e) {

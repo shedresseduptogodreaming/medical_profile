@@ -4,6 +4,9 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/app_logo.dart';
 import 'profile_screen.dart';
 import '../../../models/user_profile.dart';
+import '../auth/auth_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../auth/auth_screen.dart';
 
 class EditScreen extends StatefulWidget {
   final ProfileData initialData;
@@ -523,6 +526,71 @@ class _EditScreenState extends State<EditScreen> {
           _buildTextField(
             controller: _notesController,
             hint: 'Заметки',
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            height: 58,
+            child: OutlinedButton(
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: AppColors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    title: Text(
+                      'Выйти из аккаунта?',
+                      style: AppTextStyles.heading.copyWith(fontSize: 24),
+                    ),
+                    content: Text(
+                      'Вы уверены, что хотите выйти?',
+                      style: AppTextStyles.fieldHint,
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: Text(
+                          'Отмена',
+                          style: AppTextStyles.fieldText.copyWith(color: AppColors.grey),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: Text(
+                          'Выйти',
+                          style: AppTextStyles.fieldText.copyWith(color: AppColors.orange),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true && context.mounted) {
+                  await Supabase.instance.client.auth.signOut();
+
+                  if (context.mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                      (route) => false,
+                    );
+                  }
+                }
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange,
+                side: const BorderSide(color: AppColors.orange),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: Text(
+                'Выйти из аккаунта',
+                style: AppTextStyles.buttonText.copyWith(color: AppColors.orange),
+              ),
+            ),
           ),
         ],
       ),

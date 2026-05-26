@@ -5,7 +5,6 @@ import '../../../core/yandex_auth_service.dart';
 import 'login_screen.dart';
 import 'register_screen.dart';
 import '../home/home_screen.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthScreen extends StatelessWidget {
   const AuthScreen({super.key});
@@ -64,16 +63,11 @@ class AuthScreen extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () async {
                   final result = await YandexAuthService.signIn();
-                  print('Яндекс result: $result');
                   if (result != null && context.mounted) {
-                    // Сохраняем uid локально
-                    final prefs = await SharedPreferences.getInstance();
-                    await prefs.setString('yandex_uid', result['uid']);
-                    print('Сохранён uid: ${result['uid']}');
-                    
-                    Navigator.pushReplacement(
+                    Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const HomeScreen()),
+                      (route) => false,
                     );
                   }
                 },
