@@ -22,21 +22,18 @@ class _QrScreenState extends State<QrScreen> {
   final GlobalKey _qrKey = GlobalKey();
 
   // ============================================================
-// ПАТЧ v2 для lib/features/profile/qr_screen.dart
-// Заменить метод _qrData целиком (внутри класса _QrScreenState)
-// ============================================================
+  // ПАТЧ v2 для lib/features/profile/qr_screen.dart
+  // Заменить метод _qrData целиком (внутри класса _QrScreenState)
+  // ============================================================
 
   String get _qrData {
     final d = widget.profileData;
 
-    // Пустой профиль
-    if (d.lastName.isEmpty && d.firstName.isEmpty) {
-      return 'Профиль не заполнен';
-    }
-
-    // --- Имя (без отчества) ---
-    final fn = '${d.lastName} ${d.firstName}'.trim();
-    final n  = '${d.lastName};${d.firstName};;;';
+    // --- Имя: подсказка для iOS превью камеры ---
+    // iOS показывает FN/N в превью — используем как инструкцию пользователю
+    const hint = 'Сохраните контакт чтобы увидеть данные';
+    const fn = hint;
+    const n  = 'Сохраните контакт чтобы увидеть данные;;;;';
 
     // --- Дата рождения: DD.MM.YYYY → YYYY-MM-DD ---
     // Формат с дефисами работает корректно и на iOS и на Android
@@ -57,19 +54,25 @@ class _QrScreenState extends State<QrScreen> {
     // iOS показывает NOTE только после нажатия "Добавить контакт" — это ограничение Apple
     // Android показывает NOTE сразу в превью
     final noteLines = <String>[];
+    // "Это Имя Фамилия"
+    final realName = '${d.firstName} ${d.lastName}'.trim();
+    if (realName.isNotEmpty) noteLines.add('Это $realName');
+    // "Телефон - Кем приходится"
+    if (rawPhone.isNotEmpty && d.contactRole.isNotEmpty) {
+      noteLines.add('$rawPhone - ${d.contactRole}');
+    } else if (rawPhone.isNotEmpty) {
+      noteLines.add(rawPhone);
+    }
+    if (d.birthDate.isNotEmpty)   noteLines.add('ДР: ${d.birthDate}');
     if (d.bloodType.isNotEmpty || d.rhFactor.isNotEmpty) {
       noteLines.add('Группа крови: ${d.bloodType} ${d.rhFactor}'.trim());
     }
+    if (d.height.isNotEmpty)      noteLines.add('Рост: ${d.height}');
+    if (d.weight.isNotEmpty)      noteLines.add('Вес: ${d.weight}');
     if (d.allergies.isNotEmpty)   noteLines.add('Аллергии: ${d.allergies}');
     if (d.medications.isNotEmpty) noteLines.add('Лекарства: ${d.medications}');
     if (d.conditions.isNotEmpty)  noteLines.add('Болезни: ${d.conditions}');
-    if (d.height.isNotEmpty)      noteLines.add('Рост: ${d.height}');
-    if (d.weight.isNotEmpty)      noteLines.add('Вес: ${d.weight}');
     if (d.notes.isNotEmpty)       noteLines.add('Заметки: ${d.notes}');
-    if (d.contactName.isNotEmpty) {
-      final label = d.contactRole.isNotEmpty ? d.contactRole : 'Контакт';
-      noteLines.add('$label: ${d.contactName}');
-    }
 
     // Переносы строк внутри NOTE экранируются как \n (литерально)
     final note = noteLines.join('\\n');
@@ -100,7 +103,7 @@ class _QrScreenState extends State<QrScreen> {
 
     return lines.join('\r\n');
   }
-
+  
   Future<Uint8List?> _captureQrImage() async {
     try {
       final boundary = _qrKey.currentContext?.findRenderObject()

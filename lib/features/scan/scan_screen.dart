@@ -18,7 +18,6 @@ class _ScanScreenState extends State<ScanScreen> {
     'assets/images/2.png',
     'assets/images/3.png',
     'assets/images/4.png',
-    'assets/images/5.png',
   ];
 
   @override
